@@ -30,10 +30,15 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// API 路由（待实现）
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/events', eventRoutes);
+// API 路由
+const authRoutes = require('./routes/auth');
+const eventRoutes = require('./routes/events');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/events', eventRoutes);
+
+// 模板路由（待实现）
+// const templateRoutes = require('./routes/templates');
 // app.use('/api/templates', templateRoutes);
 
 // 404 处理
@@ -52,6 +57,7 @@ app.listen(PORT, () => {
   console.log(`🚀 百信活动工坊后端服务已启动`);
   console.log(`📍 监听端口：${PORT}`);
   console.log(`🔗 健康检查：http://localhost:${PORT}/health`);
+  console.log(`📚 API 文档：http://localhost:${PORT}/api`);
 });
 
 module.exports = app;
