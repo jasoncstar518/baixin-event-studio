@@ -47,7 +47,7 @@
         <!-- 组件库 -->
         <div class="components-section">
           <h3>组件库</h3>
-        <div class="component-list">
+          <div class="component-list">
           <div class="component-item" draggable="true" @dragstart="dragComponent('text')">
             <el-icon><Edit /></el-icon>
             <span>文字</span>
@@ -88,8 +88,8 @@
             <el-icon><WarningFilled /></el-icon>
             <span>惩罚卡</span>
           </div>
+          </div>
         </div>
-        </aside>
       </div>
 
       <!-- 中间画布 -->
