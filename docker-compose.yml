@@ -43,7 +43,7 @@ services:
       DATABASE_URL: postgresql://baixin:baixin123@postgres:5432/baixin_event_studio
       REDIS_URL: redis://redis:6379
       PORT: 3000
-      JWT_SECRET: your-secret-key-change-in-production
+      JWT_SECRET: c76549f5b1488d65338a4a70c0a93544e16c553ffe0c3ac2156257d6aaf07352
     ports:
       - "3000:3000"
     depends_on:
