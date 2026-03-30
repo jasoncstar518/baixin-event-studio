@@ -16,9 +16,37 @@
     </header>
 
     <div class="editor-body">
-      <!-- 左侧组件面板 -->
-      <aside class="components-panel">
-        <h3>组件库</h3>
+      <!-- 左侧页面和组件面板 -->
+      <aside class="left-panel">
+        <!-- 页面管理 -->
+        <div class="pages-section">
+          <div class="section-header">
+            <h3>页面</h3>
+            <el-button type="primary" size="small" @click="addPage" title="添加页面">+</el-button>
+          </div>
+          <div class="page-list">
+            <div 
+              v-for="(page, index) in pages" 
+              :key="page.id"
+              :class="['page-item', { active: currentPageId === page.id }]"
+              @click="switchPage(page.id)"
+            >
+              <el-icon><Document /></el-icon>
+              <span class="page-name">{{ page.name || `页面 ${index + 1}` }}</span>
+              <el-button 
+                v-if="pages.length > 1"
+                size="small" 
+                type="danger" 
+                class="delete-page-btn"
+                @click.stop="deletePage(page.id)"
+              >×</el-button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 组件库 -->
+        <div class="components-section">
+          <h3>组件库</h3>
         <div class="component-list">
           <div class="component-item" draggable="true" @dragstart="dragComponent('text')">
             <el-icon><Edit /></el-icon>
@@ -27,6 +55,10 @@
           <div class="component-item" draggable="true" @dragstart="dragComponent('image')">
             <el-icon><Picture /></el-icon>
             <span>图片</span>
+          </div>
+          <div class="component-item" draggable="true" @dragstart="dragComponent('button')">
+            <el-icon><Pointer /></el-icon>
+            <span>按钮</span>
           </div>
           <div class="component-item" draggable="true" @dragstart="dragComponent('timeline')">
             <el-icon><Connection /></el-icon>
@@ -57,12 +89,15 @@
             <span>惩罚卡</span>
           </div>
         </div>
-      </aside>
+      </div>
 
       <!-- 中间画布 -->
       <main class="canvas-area">
+        <div class="page-indicator">
+          <span>当前页面：{{ currentPage?.name || '未命名页面' }}</span>
+        </div>
         <div class="canvas" @dragover.prevent @drop="dropComponent">
-          <draggable v-model="components" item-key="id" class="components-list">
+          <draggable v-model="currentPageComponents" item-key="id" class="components-list">
             <template #item="{ element }">
               <div class="canvas-component" :class="{ selected: selectedId === element.id }" @click="selectComponent(element)">
                 <component-preview :component="element" />
@@ -74,7 +109,7 @@
               </div>
             </template>
           </draggable>
-          <el-empty v-if="components.length === 0" description="从左侧拖拽组件到此处" />
+          <el-empty v-if="currentPageComponents.length === 0" description="从左侧拖拽组件到此处" />
         </div>
       </main>
 
@@ -105,6 +140,34 @@
               </el-select>
             </el-form-item>
           </template>
+
+          <!-- 按钮组件属性 -->
+          <template v-if="selectedComponent.type === 'button'">
+            <el-form-item label="文字">
+              <el-input v-model="selectedComponent.props.text" />
+            </el-form-item>
+            <el-form-item label="跳转页面">
+              <el-select v-model="selectedComponent.props.jumpToPage" placeholder="选择目标页面" style="width: 100%">
+                <el-option 
+                  v-for="page in pages" 
+                  :key="page.id" 
+                  :label="page.name" 
+                  :value="page.id"
+                  :disabled="page.id === currentPageId"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="按钮颜色">
+              <el-color-picker v-model="selectedComponent.props.color" />
+            </el-form-item>
+            <el-form-item label="尺寸">
+              <el-select v-model="selectedComponent.props.size" style="width: 100%">
+                <el-option label="小" value="small" />
+                <el-option label="中" value="default" />
+                <el-option label="大" value="large" />
+              </el-select>
+            </el-form-item>
+          </template>
           
           <!-- 图片组件属性 -->
           <template v-if="selectedComponent.type === 'image'">
@@ -125,6 +188,17 @@
                 <el-option label="覆盖" value="cover" />
                 <el-option label="包含" value="contain" />
                 <el-option label="填充" value="fill" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="跳转页面">
+              <el-select v-model="selectedComponent.props.jumpToPage" placeholder="不跳转" style="width: 100%" clearable>
+                <el-option 
+                  v-for="page in pages" 
+                  :key="page.id" 
+                  :label="page.name" 
+                  :value="page.id"
+                  :disabled="page.id === currentPageId"
+                />
               </el-select>
             </el-form-item>
           </template>
@@ -299,7 +373,8 @@ if (token) {
 }
 
 const eventTitle = ref('未命名活动')
-const components = ref([])
+const pages = ref([{ id: 'page_1', name: '页面 1', components: [] }])
+const currentPageId = ref('page_1')
 const selectedId = ref(null)
 const draggedType = ref(null)
 const eventId = ref(null)
@@ -318,8 +393,20 @@ const isUndoRedo = ref(false)
 // 自动保存定时器
 let autoSaveTimer = null
 
+const currentPage = computed(() => {
+  return pages.value.find(p => p.id === currentPageId.value)
+})
+
+const currentPageComponents = computed({
+  get: () => currentPage.value?.components || [],
+  set: (val) => {
+    const page = pages.value.find(p => p.id === currentPageId.value)
+    if (page) page.components = val
+  }
+})
+
 const selectedComponent = computed(() => {
-  return components.value.find(c => c.id === selectedId.value)
+  return currentPageComponents.value.find(c => c.id === selectedId.value)
 })
 
 // 记录历史
@@ -328,7 +415,7 @@ const recordHistory = () => {
     isUndoRedo.value = false
     return
   }
-  historyStack.value.push(JSON.parse(JSON.stringify(components.value)))
+  historyStack.value.push(JSON.parse(JSON.stringify(pages.value)))
   if (historyStack.value.length > 50) historyStack.value.shift()
   futureStack.value = []
 }
@@ -339,8 +426,8 @@ const undo = () => {
     ElMessage.info('没有可撤销的操作')
     return
   }
-  futureStack.value.push(JSON.parse(JSON.stringify(components.value)))
-  components.value = historyStack.value.pop()
+  futureStack.value.push(JSON.parse(JSON.stringify(pages.value)))
+  pages.value = historyStack.value.pop()
   isUndoRedo.value = true
   ElMessage.success('已撤销')
 }
@@ -351,8 +438,8 @@ const redo = () => {
     ElMessage.info('没有可重做的操作')
     return
   }
-  historyStack.value.push(JSON.parse(JSON.stringify(components.value)))
-  components.value = futureStack.value.pop()
+  historyStack.value.push(JSON.parse(JSON.stringify(pages.value)))
+  pages.value = futureStack.value.pop()
   isUndoRedo.value = true
   ElMessage.success('已重做')
 }
@@ -388,7 +475,7 @@ const dropComponent = (event) => {
     style: {}
   }
   
-  components.value.push(newComponent)
+  currentPageComponents.value.push(newComponent)
   draggedType.value = null
 }
 
@@ -397,7 +484,14 @@ const getDefaultProps = (type) => {
     case 'text':
       return { content: '请输入文字', fontSize: 24, color: '#333333', textAlign: 'center' }
     case 'image':
-      return { url: '', alt: '图片', width: 300, height: 200, objectFit: 'cover' }
+      return { url: '', alt: '图片', width: 300, height: 200, objectFit: 'cover', jumpToPage: null }
+    case 'button':
+      return { 
+        text: '按钮', 
+        jumpToPage: null,
+        color: '#409eff',
+        size: 'default'
+      }
     case 'timeline':
       return { 
         items: [
@@ -460,26 +554,57 @@ const selectComponent = (component) => {
 
 const removeComponent = (id) => {
   recordHistory()
-  components.value = components.value.filter(c => c.id !== id)
+  currentPageComponents.value = currentPageComponents.value.filter(c => c.id !== id)
   if (selectedId.value === id) selectedId.value = null
 }
 
 const moveUp = (id) => {
   recordHistory()
-  const index = components.value.findIndex(c => c.id === id)
+  const index = currentPageComponents.value.findIndex(c => c.id === id)
   if (index > 0) {
-    [components.value[index - 1], components.value[index]] = 
-    [components.value[index], components.value[index - 1]]
+    [currentPageComponents.value[index - 1], currentPageComponents.value[index]] = 
+    [currentPageComponents.value[index], currentPageComponents.value[index - 1]]
   }
 }
 
 const moveDown = (id) => {
   recordHistory()
-  const index = components.value.findIndex(c => c.id === id)
-  if (index < components.value.length - 1) {
-    [components.value[index], components.value[index + 1]] = 
-    [components.value[index + 1], components.value[index]]
+  const index = currentPageComponents.value.findIndex(c => c.id === id)
+  if (index < currentPageComponents.value.length - 1) {
+    [currentPageComponents.value[index], currentPageComponents.value[index + 1]] = 
+    [currentPageComponents.value[index + 1], currentPageComponents.value[index]]
   }
+}
+
+// 页面管理
+const addPage = () => {
+  recordHistory()
+  const newPageId = `page_${Date.now()}`
+  pages.value.push({
+    id: newPageId,
+    name: `页面 ${pages.value.length + 1}`,
+    components: []
+  })
+  currentPageId.value = newPageId
+  ElMessage.success('页面已添加')
+}
+
+const deletePage = (pageId) => {
+  if (pages.value.length <= 1) {
+    ElMessage.warning('至少保留一个页面')
+    return
+  }
+  recordHistory()
+  pages.value = pages.value.filter(p => p.id !== pageId)
+  if (currentPageId.value === pageId) {
+    currentPageId.value = pages.value[0].id
+  }
+  ElMessage.success('页面已删除')
+}
+
+const switchPage = (pageId) => {
+  currentPageId.value = pageId
+  selectedId.value = null
 }
 
 // 图片上传处理
@@ -545,15 +670,23 @@ const save = async () => {
   try {
     collectCards()
     
-    const eventData = {
-      title: eventTitle.value,
-      components: components.value.map((c, index) => ({
+    // 多页面数据结构
+    const pagesData = pages.value.map((page, pageIndex) => ({
+      pageId: page.id,
+      pageName: page.name,
+      sortOrder: pageIndex,
+      components: page.components.map((c, compIndex) => ({
         id: c.id,
         type: c.type,
         props: c.props,
         config: c.props,
-        sortOrder: index
+        sortOrder: compIndex
       }))
+    }))
+    
+    const eventData = {
+      title: eventTitle.value,
+      pages: pagesData
     }
     
     let response
@@ -567,8 +700,8 @@ const save = async () => {
       })
       eventId.value = response.data.data.id
       
-      // 保存组件
-      if (components.value.length > 0) {
+      // 保存页面和组件
+      if (pagesData.length > 0) {
         await axios.put(`/events/${eventId.value}`, eventData)
       }
     }
@@ -585,7 +718,8 @@ const save = async () => {
 // 自动保存
 const startAutoSave = () => {
   autoSaveTimer = setInterval(() => {
-    if (components.value.length > 0 && eventId.value) {
+    const hasComponents = pages.value.some(p => p.components && p.components.length > 0)
+    if (hasComponents && eventId.value) {
       save()
     }
   }, 30000)
@@ -594,6 +728,14 @@ const startAutoSave = () => {
 // 预览功能
 const preview = () => {
   const previewWindow = window.open('', '_blank')
+  
+  let pagesHtml = pages.value.map((page, pageIndex) => `
+    <div class="page" id="page_${page.id}" style="display: ${pageIndex === 0 ? 'block' : 'none'}">
+      <h2 class="page-title">${page.name}</h2>
+      ${page.components.map(c => renderPreview(c, page.id)).join('')}
+    </div>
+  `).join('')
+  
   previewWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -602,37 +744,53 @@ const preview = () => {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-          .component { margin-bottom: 20px; padding: 16px; border-radius: 8px; background: #fafafa; }
+          .page { margin-bottom: 40px; }
+          .page-title { text-align: center; color: #667eea; margin-bottom: 30px; }
+          .component { margin-bottom: 20px; padding: 16px; border-radius: 8px; background: #fafafa; cursor: pointer; }
+          .component:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
           .marquee-container { overflow: hidden; white-space: nowrap; }
-          .marquee { display: inline-block; animation: scroll ${10 / (selectedComponent?.props?.speed || 5)}s linear infinite; }
+          .marquee { display: inline-block; animation: scroll ${10 / 5}s linear infinite; }
           @keyframes scroll {
             0% { transform: translateX(100%); }
             100% { transform: translateX(-100%); }
           }
           .quiz-option { padding: 12px; margin: 8px 0; border: 2px solid #e0e0e0; border-radius: 8px; cursor: pointer; }
           .quiz-option:hover { border-color: #409eff; }
-          .quiz-option.correct { border-color: #67c23a; background: #f0f9ff; }
-          .quiz-option.wrong { border-color: #f56c6c; background: #fef0f0; }
-          .card { padding: 20px; text-align: center; border-radius: 12px; }
+          .card { padding: 20px; text-align: center; border-radius: 12px; cursor: pointer; }
           .reward-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
           .punish-card { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+          .button-component { display: inline-block; padding: 12px 24px; border-radius: 8px; cursor: pointer; }
         </style>
       </head>
       <body>
-        <h1>${eventTitle.value}</h1>
-        ${components.value.map(c => renderPreview(c)).join('')}
+        <h1 style="text-align:center">${eventTitle.value}</h1>
+        ${pagesHtml}
+        <script>
+          function navigateToPage(pageId) {
+            const pages = document.querySelectorAll('.page');
+            pages.forEach(p => p.style.display = 'none');
+            const targetPage = document.getElementById('page_' + pageId);
+            if (targetPage) targetPage.style.display = 'block';
+          }
+        <\/script>
       </body>
     </html>
   `)
   ElMessage.success('预览已打开')
 }
 
-const renderPreview = (component) => {
+const renderPreview = (component, pageId) => {
+  const jumpHandler = component.props.jumpToPage ? `onclick="navigateToPage('${component.props.jumpToPage}')"` : ''
+  
   switch (component.type) {
     case 'text':
       return `<div class="component" style="font-size:${component.props.fontSize}px;color:${component.props.color};text-align:${component.props.textAlign}">${component.props.content}</div>`
     case 'image':
-      return `<div class="component"><img src="${component.props.url || 'https://via.placeholder.com/300x200'}" style="max-width:100%" /></div>`
+      return `<div class="component" ${jumpHandler}><img src="${component.props.url || 'https://via.placeholder.com/300x200'}" style="max-width:100%" /></div>`
+    case 'button':
+      return `<div class="component button-component" ${jumpHandler} style="background:${component.props.color};color:white;padding:12px 24px;border-radius:8px;display:inline-block;">
+        ${component.props.text}
+      </div>`
     case 'timeline':
       return `<div class="component"><h3>时间线</h3>${component.props.items.map(i => `<p>${i.time} - ${i.title}</p>`).join('')}</div>`
     case 'countdown':
@@ -724,14 +882,32 @@ const loadEvent = async (id) => {
     eventTitle.value = data.title
     eventId.value = data.id
     
-    // 转换组件数据
-    if (data.components && data.components.length > 0) {
-      components.value = data.components.map(c => ({
-        id: c.id || `comp_${Date.now()}_${Math.random()}`,
-        type: c.componentType,
-        props: c.config || {},
-        style: {}
+    // 多页面数据加载
+    if (data.pages && data.pages.length > 0) {
+      pages.value = data.pages.map(p => ({
+        id: p.pageId || `page_${Date.now()}_${Math.random()}`,
+        name: p.pageName || '未命名页面',
+        components: (p.components || []).map(c => ({
+          id: c.id || `comp_${Date.now()}_${Math.random()}`,
+          type: c.componentType,
+          props: c.config || {},
+          style: {}
+        }))
       }))
+      currentPageId.value = pages.value[0].id
+    } else if (data.components && data.components.length > 0) {
+      // 兼容旧数据（单页面）
+      pages.value = [{
+        id: 'page_1',
+        name: '页面 1',
+        components: data.components.map(c => ({
+          id: c.id || `comp_${Date.now()}_${Math.random()}`,
+          type: c.componentType,
+          props: c.config || {},
+          style: {}
+        }))
+      }]
+      currentPageId.value = 'page_1'
     }
     
     ElMessage.success('加载成功')
@@ -835,6 +1011,97 @@ const ComponentPreview = {
   overflow: hidden;
 }
 
+.left-panel {
+  width: 220px;
+  background: #fafafa;
+  border-right: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pages-section {
+  border-bottom: 1px solid #e0e0e0;
+  max-height: 40%;
+  overflow-y: auto;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.page-list {
+  padding: 0 12px 12px;
+}
+
+.page-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.page-item:hover {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.page-item.active {
+  border-color: #409eff;
+  background: #409eff;
+  color: white;
+}
+
+.page-item .page-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delete-page-btn {
+  padding: 2px 6px;
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.page-item:hover .delete-page-btn {
+  opacity: 1;
+}
+
+.page-item.active .delete-page-btn {
+  color: white;
+}
+
+.page-item.active .delete-page-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.components-section {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
 .components-panel {
   width: 200px;
   background: #fafafa;
@@ -877,6 +1144,18 @@ const ComponentPreview = {
   background: #f5f7fa;
   padding: 20px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-indicator {
+  text-align: center;
+  padding: 8px;
+  background: #409eff;
+  color: white;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  font-size: 14px;
 }
 
 .canvas {
