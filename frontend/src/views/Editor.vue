@@ -90,7 +90,7 @@
           </div>
           </div>
         </div>
-      </div>
+        </aside>
 
       <!-- 中间画布 -->
       <main class="canvas-area">
