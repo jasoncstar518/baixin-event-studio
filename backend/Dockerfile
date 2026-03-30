@@ -2,8 +2,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# 安装构建依赖
-RUN apk add --no-cache python3 make g++
+# 安装构建依赖和 OpenSSL 1.1 兼容库（Prisma 需要）
+RUN apk add --no-cache python3 make g++ openssl1.1-compat
 
 # 复制 package 文件
 COPY package*.json ./
