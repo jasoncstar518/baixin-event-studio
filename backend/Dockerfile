@@ -1,14 +1,12 @@
-FROM node:18-slim
+FROM node:18-bookworm
 
 WORKDIR /app
 
-# 安装 OpenSSL 3 和构建依赖（Prisma 5.x 支持 OpenSSL 3）
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3 \
+# 使用国内镜像源加速并安装 Prisma 所需依赖
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && apt-get install -y --no-install-recommends \
     openssl \
-    python3 \
-    make \
-    g++ \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制 package 文件
