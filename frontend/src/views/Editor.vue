@@ -89,6 +89,7 @@
             <span>惩罚卡</span>
           </div>
         </div>
+        </aside>
       </div>
 
       <!-- 中间画布 -->
