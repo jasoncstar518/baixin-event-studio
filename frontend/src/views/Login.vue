@@ -55,14 +55,18 @@ const handleLogin = async () => {
     if (valid) {
       loading.value = true
       try {
-        // TODO: 调用登录 API
-        // const res = await axios.post('/api/auth/login', form)
-        // localStorage.setItem('token', res.data.token)
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form)
+        })
+        const data = await res.json()
+        localStorage.setItem('token', data.token)
         
-        ElMessage.success('登录成功（演示模式）')
+        ElMessage.success('登录成功')
         router.push('/dashboard')
       } catch (error) {
-        ElMessage.error('登录失败')
+        ElMessage.error('登录失败：' + error.message)
       } finally {
         loading.value = false
       }
